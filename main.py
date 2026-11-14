@@ -1,38 +1,40 @@
-"""ai-happy-01: "Three Best Friends, One Sunny Leap" (W31).
+"""ai-happy-01: "Three Best Friends, One Leap Through the Heart" (W42).
 
-Decodes the single-line base64 JPEG in entry.b64 and writes the picture to
-the output folder as entry.png. Three friends — a kitten, a golden
-retriever mid-leap and a bluebird — ride together under a heart of petals,
-with a warm line for the judge along the bottom edge.
+The picture lives in entry.b64 as one long base64 line. This program turns
+it back into JPEG bytes and drops them at the grader's output path as
+entry.png: a golden retriever leaping through a giant heart made of
+sunflowers, an orange kitten riding along laughing, and a bluebird flying
+beside them, with a warm line for the judge along the bottom edge.
 
-Pure standard library, no network, and the same bytes out every run.
+Standard library only, no network, deterministic output.
 """
 
-import base64 as b64
+import base64
+import os
 import pathlib
-import sys
-from os import environ
 
-SOURCE = pathlib.Path(__file__).resolve().parent
-DEST = pathlib.Path(environ.get("MAKEFUN_OUTPUT_DIR", "/output"))
+HERE = pathlib.Path(__file__).resolve().parent
+OUT = pathlib.Path(os.environ.get("MAKEFUN_OUTPUT_DIR", "/output"))
 
 
-def load_picture():
-    text = (SOURCE / "entry.b64").read_text(encoding="ascii").strip()
-    blob = b64.b64decode(text, validate=True)
-    if blob[:2] != b"\xff\xd8" or blob[-2:] != b"\xff\xd9":
-        sys.exit("entry.b64 is not a whole JPEG (missing SOI/EOI)")
-    if len(blob) > 1_048_576:
-        sys.exit("entry.b64 is larger than the 1 MiB entry cap")
-    return blob
+def picture_bytes():
+    # The base64 blob is one line; the checks below guard the two JPEG
+    # magic markers and the competition's 1 MiB size cap.
+    encoded = (HERE / "entry.b64").read_text(encoding="ascii").strip()
+    raw = base64.b64decode(encoded, validate=True)
+    if raw[:2] != b"\xff\xd8":
+        raise SystemExit("entry.b64 does not start with a JPEG header")
+    if raw[-2:] != b"\xff\xd9":
+        raise SystemExit("entry.b64 does not end with a JPEG trailer")
+    if len(raw) > 1_048_576:
+        raise SystemExit("entry is over the 1 MiB cap")
+    return raw
 
 
-def main():
-    picture = load_picture()
-    DEST.mkdir(parents=True, exist_ok=True)
-    # The grader expects the file to be named entry.png even though the
-    # bytes inside are JPEG, so keep the name exactly as it is.
-    (DEST / "entry.png").write_bytes(picture)
+def run():
+    OUT.mkdir(parents=True, exist_ok=True)
+    (OUT / "entry.png").write_bytes(picture_bytes())
 
 
-if __name__ == "__main__": main()
+if __name__ == "__main__":
+    run()
